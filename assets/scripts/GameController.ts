@@ -1,47 +1,37 @@
-import { _decorator, Component, ERigidBody2DType, EventTouch, find, Input, input, Node, RigidBody, RigidBody2D, tween, Vec2, Vec3 } from 'cc';
+import { _decorator, Component, ERigidBody2DType, EventTouch, Input, input, Node, RigidBody2D, instantiate, Vec2 } from 'cc';
+import {Bird} from './Bird';
 const { ccclass, property } = _decorator;
 
 @ccclass('GameController')
 export class GameController extends Component {
 
-    @property({
-        type: Node
-    })
-    private bird:Node;
+    @property({ type: Node })
+    private bird: Node;  // Keep pointing to your original bird node in the scene
 
     start() {
-        // this.bird = find("Canvas/bluebird-upflap");
         input.on(Input.EventType.TOUCH_START, this.onTouchStart, this);
-        input.on(Input.EventType.TOUCH_MOVE, this.onTouchStart, this);
-        input.on(Input.EventType.TOUCH_END, this.onTouchStart, this);
     }
+
     onTouchStart(event: EventTouch) {
-        console.log(event.getUILocation());  // location on UI space
-        let inputPosition:Vec2 = event.getUILocation();
-        this.bird.setWorldPosition(inputPosition.x,inputPosition.y,0);
-        
-        this.bird.getComponent(RigidBody2D).type = ERigidBody2DType.Dynamic;
-        this.bird.getComponent(RigidBody2D).wakeUp();
+    const inputPosition: Vec2 = event.getUILocation();
+
+    const newBird: Node = instantiate(this.bird);
+    this.bird.parent.addChild(newBird);
+
+    // Force reset to level 1 state regardless of what the template looks like
+    const birdComponent = newBird.getComponent(Bird);
+    if (birdComponent) {
+        birdComponent.resetToDefault();
     }
 
+    newBird.setWorldPosition(inputPosition.x, inputPosition.y, 0);
 
-
-    moveToX(node: Node, targetX: number, duration: number = 0.5) {
-        const currentPos = node.worldPosition.clone();
-
-        tween(node)
-            .to(duration, {
-                worldPosition: new Vec3(targetX, currentPos.y, currentPos.z)
-            })
-            .start();
-    }
-
-    //1 kejadian = 1 frame
-    //dalam 1 frame = 1 update
-    update(deltaTime: number) {
-        // this.node.translate(new Vec3(10,0,0));
-        // console.log("update game controller");
-        // for(let i=0;i<999999999;i++){}
+    const rb = newBird.getComponent(RigidBody2D);
+    if (rb) {
+        rb.type = ERigidBody2DType.Dynamic;
+        rb.wakeUp();
     }
 }
 
+    update(deltaTime: number) {}
+}
