@@ -66,6 +66,9 @@ export class Bird extends Component {
                 this.getComponent(Sprite).spriteFrame = this.spriteRedbird;
                 this.node.setScale(new Vec3(2, 2, 1));
                 break;
+            case 4:
+                this.listToRemove.push(this.node);
+                break;
         }
     }
 
