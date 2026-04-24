@@ -9,20 +9,29 @@ export class GameController extends Component {
     private bird: Node;  // Keep pointing to your original bird node in the scene
 
     start() {
-        input.on(Input.EventType.TOUCH_START, this.onTouchStart, this);
+    this.bird.active = false;
+    input.off(Input.EventType.TOUCH_START, this.onTouchStart, this);
+    input.on(Input.EventType.TOUCH_START, this.onTouchStart, this);
     }
 
     onTouchStart(event: EventTouch) {
+    // Guard — if template is somehow gone, do nothing
+    if (!this.bird) {
+        console.error("Bird template is missing!");
+        return;
+    }
+
     const inputPosition: Vec2 = event.getUILocation();
 
+    // Temporarily activate just long enough to clone
+    this.bird.active = true;
     const newBird: Node = instantiate(this.bird);
+    this.bird.active = false;  // immediately hide template again
+
     this.bird.parent.addChild(newBird);
 
-    // Force reset to level 1 state regardless of what the template looks like
     const birdComponent = newBird.getComponent(Bird);
-    if (birdComponent) {
-        birdComponent.resetToDefault();
-    }
+    if (birdComponent) birdComponent.resetToDefault();
 
     newBird.setWorldPosition(inputPosition.x, inputPosition.y, 0);
 
@@ -31,7 +40,7 @@ export class GameController extends Component {
         rb.type = ERigidBody2DType.Dynamic;
         rb.wakeUp();
     }
-}
+    }
 
     update(deltaTime: number) {}
 }
