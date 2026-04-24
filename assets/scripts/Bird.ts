@@ -1,97 +1,81 @@
-import {
-    _decorator, Collider2D, Component, Contact2DType,
-    ERigidBody2DType, IPhysics2DContact, Node, Prefab,
-    RigidBody2D, Sprite, SpriteFrame, Vec3, instantiate
-} from 'cc';
+import { _decorator, Collider2D, Component, Contact2DType, IPhysics2DContact, Node, Sprite, SpriteFrame, Vec3 } from 'cc';
 const { ccclass, property } = _decorator;
 
 @ccclass('Bird')
 export class Bird extends Component {
 
-    // -- Inspector fields --------------------------------------------------
+    @property({ type: SpriteFrame })
+    private spriteBluebird: SpriteFrame;   // level 1 — drag bluebird-downflap here
 
     @property({ type: SpriteFrame })
-    public spriteBlueBird: SpriteFrame = null;      // bluebird-downflap
+    private spriteYellowbird: SpriteFrame; // level 2 — drag yellowbird-downflap here
 
-    @property({ type: SpriteFrame })
-    public spriteYellowBird: SpriteFrame = null;    // yellowbird-downflap
+    @property({ type: SpriteFrame})
+    private spriteRedbird: SpriteFrame; // level 3 - drag redbird-downflap here
 
-    @property({ type: Prefab })
-    public yellowBirdPrefab: Prefab = null;          // YellowBird.prefab (bigger scale)
+    private listToRemove: Node[] = [];
+    private level: number = 1;
+    private merging: boolean = false;
 
-    // -- Runtime state -----------------------------------------------------
-
-    // 0 = blue, 1 = yellow (used to check if same level for merging)
-    public level: number = 0;
-
-    // Guards against both birds triggering merge at the same time
-    private hasMerged: boolean = false;
-
-    // -----------------------------------------------------------------------
+    public resetToDefault() {
+    this.level = 1;
+    this.merging = false;
+    this.listToRemove = [];
+    this.getComponent(Sprite).spriteFrame = this.spriteBluebird;
+    this.node.setScale(new Vec3(1, 1, 1));
+}
 
     start() {
         const collider = this.getComponent(Collider2D);
         if (collider) {
             collider.on(Contact2DType.BEGIN_CONTACT, this.onBeginContact, this);
+            collider.on(Contact2DType.END_CONTACT, this.onEndContact, this);
         }
     }
 
-    onBeginContact(
-        selfCollider: Collider2D,
-        otherCollider: Collider2D,
-        contact: IPhysics2DContact | null
-    ) {
+    onBeginContact(selfCollider: Collider2D, otherCollider: Collider2D, contact: IPhysics2DContact | null) {
+        if (this.merging) return;
+
         const otherBird = otherCollider.node.getComponent(Bird);
+        if (!otherBird || otherBird.merging) return;
 
-        // Only care about Bird-to-Bird contacts
-        if (!otherBird) return;
-
-        // MERGE condition: both are blue (level 0) and neither has merged yet
         if (
-            this.level === 0 &&
-            otherBird.level === 0 &&
-            !this.hasMerged &&
-            !otherBird.hasMerged
+            selfCollider.group === otherCollider.group &&
+            this.level === otherBird.level
         ) {
-            this.hasMerged = true;
-            otherBird.hasMerged = true;
+            this.merging = true;
+            otherBird.merging = true;
 
-            // Midpoint between the two birds — spawn yellow bird here
-            const posA = this.node.worldPosition;
-            const posB = otherCollider.node.worldPosition;
-            const midPoint = new Vec3(
-                (posA.x + posB.x) / 2,
-                (posA.y + posB.y) / 2,
-                0
-            );
-
-            const otherNode = otherCollider.node;
-
-            // Defer to next frame to avoid modifying the scene mid-physics-step
-            this.scheduleOnce(() => {
-                // Spawn yellow bird at midpoint
-                if (this.yellowBirdPrefab && this.node.parent) {
-                    const yellow = instantiate(this.yellowBirdPrefab);
-                    this.node.parent.addChild(yellow);
-                    yellow.setWorldPosition(midPoint);
-
-                    // Drop it with physics
-                    const rb = yellow.getComponent(RigidBody2D);
-                    if (rb) {
-                        rb.type = ERigidBody2DType.Dynamic;
-                        rb.wakeUp();
-                    }
-                }
-
-                // Destroy both blue birds
-                if (otherNode && otherNode.isValid) otherNode.destroy();
-                if (this.node && this.node.isValid) this.node.destroy();
-            }, 0);
+            this.levelUp();
+            this.listToRemove.push(otherCollider.node);
         }
-
-        // DIFFERENT LEVELS (blue + yellow): do nothing — 
-        // RigidBody2D + Collider2D handles the physical bounce automatically.
     }
 
-    update(deltaTime: number) {}
+    onEndContact(selfCollider: Collider2D, otherCollider: Collider2D, contact: IPhysics2DContact | null) {}
+
+    levelUp() {
+        this.level++;
+        console.log("level: " + this.level);
+
+        switch (this.level) {
+            case 2:
+                this.getComponent(Sprite).spriteFrame = this.spriteYellowbird;
+                this.node.setScale(new Vec3(1.5, 1.5, 1));
+                break;
+            case 3:
+                this.getComponent(Sprite).spriteFrame = this.spriteRedbird;
+                this.node.setScale(new Vec3(2, 2, 1));
+                break;
+        }
+    }
+
+    update(deltaTime: number) {
+        if (this.listToRemove.length > 0) {
+            for (const node of this.listToRemove) {
+                node.destroy();
+            }
+            this.listToRemove = [];
+            this.merging = false;
+        }
+    }
 }
